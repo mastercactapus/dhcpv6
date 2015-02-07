@@ -1,12 +1,8 @@
 package dhcpv6
 
 import (
-	"bytes"
-	"encoding"
-	"encoding/binary"
 	"errors"
 	"io"
-	"net/http"
 )
 
 var ErrInvalidType = errors.New("Invalid type for message")
