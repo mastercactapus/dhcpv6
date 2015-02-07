@@ -3,24 +3,38 @@ package dhcpv6
 import (
 	"encoding"
 	"encoding/binary"
-	"errors"
-	"io"
 )
-
-var ErrDuidTooLong = errors.New("Duid exceeds maximum length of 128 octets")
 
 const (
 	//DUID Types
-	DuidLlt uint16 = 1
-	DuidEn  uint16 = 2
-	DuidLl  uint16 = 3
+	DuidTypeLlt uint16 = 1
+	DuidTypeEn  uint16 = 2
+	DuidTypeLl  uint16 = 3
 )
 
 // DHCP Unique Identifier (DUID)
 type Duid interface {
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler
-	Type() int
+	Type() uint16
+}
+
+func UnmarshalBinaryDuid(data []byte) (duid Duid, err error) {
+	dtype := binary.BigEndian.Uint16(data)
+	switch dtype {
+	case DuidTypeLlt:
+		duid = new(DuidTypeLlt)
+	case DuidTypeEn:
+		duid = new(DuidTypeEn)
+	case DuidTypeLl:
+		duid = new(DuidTypeLl)
+	}
+	if duid != nil {
+		err = duid.UnmarshalBinary(data)
+	} else {
+		err = ErrInvalidType
+	}
+	return
 }
 
 // DUID Based on Link-layer Address Plus Time [DUID-LLT]
@@ -30,15 +44,15 @@ type LltDuid struct {
 	LlAddress    []byte
 }
 
-func (d *LltDuid) Type() int {
-	return DuidLlt
+func (d *LltDuid) Type() uint16 {
+	return DuidTypeLlt
 }
 func (d *LltDuid) MarshalBinary() ([]byte, error) {
 	if len(d.LlAddress) > 122 {
 		return nil, ErrDuidTooLong
 	}
 	data := make([]byte, 8+len(d.LlAddress))
-	binary.BigEndian.PutUint16(data, DuidLlt)
+	binary.BigEndian.PutUint16(data, DuidTypeLlt)
 	binary.BigEndian.PutUint16(data[2:], d.HardwareType)
 	binary.BigEndian.PutUint16(data[6:], d.Time)
 	copy(data[10:], d.LlAddress)
@@ -46,12 +60,12 @@ func (d *LltDuid) MarshalBinary() ([]byte, error) {
 }
 func (d *LltDuid) UnmarshalBinary(data []byte) error {
 	if len(data) < 8 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if len(data) > 130 {
 		return ErrDuidTooLong
 	}
-	if binary.BigEndian.Uint16(data) != LltDuid {
+	if binary.BigEndian.Uint16(data) != DuidTypeLlt {
 		return ErrInvalidType
 	}
 	d.HardwareType = binary.BigEndian.Uint16(data[2:])
@@ -66,27 +80,27 @@ type EnDuid struct {
 	Identifier       []byte
 }
 
-func (d *EnDuid) Type() int {
-	return DuidEn
+func (d *EnDuid) Type() uint16 {
+	return DuidTypeEn
 }
 func (d *EnDuid) MarshalBinary() ([]byte, error) {
 	if len(d.Identifier) > 124 {
 		return nil, ErrDuidTooLong
 	}
 	data := make([]byte, 6+len(d.Identifier))
-	binary.BigEndian.PutUint16(data, DuidEn)
+	binary.BigEndian.PutUint16(data, DuidTypeEn)
 	binary.BigEndian.PutUint32(data[2:], d.EnterpriseNumber)
 	copy(data[6:], d.Identifier)
 	return data, nil
 }
 func (d *EnDuid) UnmarshalBinary(data []byte) error {
 	if len(data) < 6 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if len(data) > 130 {
 		return ErrDuidTooLong
 	}
-	if binary.BigEndian.Uint16(data) != EnDuid {
+	if binary.BigEndian.Uint16(data) != DuidTypeEn {
 		return ErrInvalidType
 	}
 	d.EnterpriseNumber = binary.BigEndian.Uint32(data[2:])
@@ -101,27 +115,27 @@ type LlDuid struct {
 	LlAddress    []byte
 }
 
-func (d *LlDuid) Type() int {
-	return DuidLl
+func (d *LlDuid) Type() uint16 {
+	return DuidTypeLl
 }
 func (d *LlDuid) MarshalBinary() ([]byte, error) {
 	if len(d.LlAddress) > 126 {
 		return nil, ErrDuidTooLong
 	}
 	data := make([]byte, 4+len(d.LlAddress))
-	binary.BigEndian.PutUint16(data, DuidLl)
+	binary.BigEndian.PutUint16(data, DuidTypeLl)
 	binary.BigEndian.PutUint16(data[2:], d.HardwareType)
 	copy(data[4:], d.LlAddress)
 	return data, nil
 }
 func (d *LlDuid) UnmarshalBinary(data []byte) error {
 	if len(data) < 4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if len(data) > 130 {
 		return ErrDuidTooLong
 	}
-	if binary.BigEndian.Uint16(data) != LlDuid {
+	if binary.BigEndian.Uint16(data) != DuidTypeLl {
 		return ErrInvalidType
 	}
 	d.HardwareType = binary.BigEndian.Uint16(data[2:])

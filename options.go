@@ -72,14 +72,14 @@ func (o *ClientIdOption) MarshalBinary() ([]byte, error) {
 }
 func (o *ClientIdOption) UnmarshalBinary(data []byte) error {
 	if len(data) < 4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if binary.BigEndian.Uint16(data) != OptionCodeClientId {
 		return ErrInvalidType
 	}
 	olen := binary.BigEndian.Uint16(data[2:])
 	if len(data) < olen+4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	duid, err := UnmarshalBinaryDuid(data[4 : olen+4])
 	if err != nil {
@@ -111,14 +111,14 @@ func (o *ServerIdOption) MarshalBinary() ([]byte, error) {
 }
 func (o *ServerIdOption) UnmarshalBinary(data []byte) error {
 	if len(data) < 4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if binary.BigEndian.Uint16(data) != OptionCodeServerId {
 		return ErrInvalidType
 	}
 	olen := binary.BigEndian.Uint16(data[2:])
 	if len(data) < olen+4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	duid, err := UnmarshalBinaryDuid(data[4 : olen+4])
 	if err != nil {
@@ -157,7 +157,7 @@ func (o *IaNaOption) MarshalBinary() ([]byte, error) {
 			return nil, err
 		}
 		if len(data)+len(optionData) > cap(data) {
-			return ErrOutOfRange
+			return ErrTooManyOptions
 		}
 		data = append(data, optionData...)
 	}
@@ -166,14 +166,14 @@ func (o *IaNaOption) MarshalBinary() ([]byte, error) {
 }
 func (o *IaNaOption) UnmarshalBinary(data []byte) error {
 	if len(data) < 16 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if binary.BigEndian.Uint16(data) != OptionCodeIaNa {
 		return ErrInvalidType
 	}
 	olen := binary.BigEndian.Uint16(data[2:])
 	if len(data) < olen+4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 
 	copy(o.IAID[:], data[4:8])
@@ -222,7 +222,7 @@ func (o *IaTaOption) MarshalBinary() ([]byte, error) {
 			return nil, err
 		}
 		if len(data)+len(optionData) > cap(data) {
-			return ErrOutOfRange
+			return ErrTooManyOptions
 		}
 		data = append(data, optionData...)
 	}
@@ -231,14 +231,14 @@ func (o *IaTaOption) MarshalBinary() ([]byte, error) {
 }
 func (o *IaTaOption) UnmarshalBinary(data []byte) error {
 	if len(data) < 8 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if binary.BigEndian.Uint16(data) != OptionCodeIaTa {
 		return ErrInvalidType
 	}
 	olen := binary.BigEndian.Uint16(data[2:])
 	if len(data) < olen+4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	copy(o.IAID[:], data[4:8])
 
@@ -292,7 +292,7 @@ func (o *IaAddrOption) MarshalBinary() ([]byte, error) {
 			return nil, err
 		}
 		if len(data)+len(optionData) > cap(data) {
-			return ErrOutOfRange
+			return ErrTooManyOptions
 		}
 		data = append(data, optionData...)
 	}
@@ -301,14 +301,14 @@ func (o *IaAddrOption) MarshalBinary() ([]byte, error) {
 }
 func (o *IaAddrOption) UnmarshalBinary(data []byte) error {
 	if len(data) < 28 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	if binary.BigEndian.Uint16(data) != OptionCodeIaAddr {
 		return ErrInvalidType
 	}
 	olen := binary.BigEndian.Uint16(data[2:])
 	if len(data) < olen+4 {
-		return io.ErrUnexpectedEOF
+		return ErrUnexpectedEOF
 	}
 	o.Ipv6Address = net.IP(data[4:20])
 	o.PreferredLifetime = binary.BigEndian.Uint32(data[20:])
@@ -328,5 +328,103 @@ func (o *IaAddrOption) UnmarshalBinary(data []byte) error {
 		o.IAddrOptions = append(o.IAddrOptions, option)
 	}
 	data = data[olen+4:]
+	return nil
+}
+
+// Option Request Option
+type OroOption struct {
+	RequestedOptionCodes []uint16
+}
+
+func (o *OroOption) Code() uint16 {
+	return OptionCodeOro
+}
+func (o *OroOption) MarshalBinary() ([]byte, error) {
+	if len(o.RequestedOptionCodes) > 32767 {
+		return nil, ErrTooManyOptions
+	}
+	data := make([]byte, 4+len(o.RequestedOptionCodes)*2)
+	binary.BigEndian.PutUint16(data, OptionCodeOro)
+	binary.BigEndian.PutUint16(data[2:], len(o.RequestedOptionCodes)*2)
+	for i := range o.RequestedOptionCodes {
+		binary.BigEndian.PutUint16(data[4+i*2:], o.RequestedOptionCodes[i])
+	}
+	return data, nil
+}
+func (o *OroOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeOro {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < olen+4 {
+		return ErrUnexpectedEOF
+	}
+	o.RequestedOptionCodes = make([]uint16, olen/2)
+	for i := range o.RequestedOptionCodes {
+		o.RequestedOptionCodes[i] = binary.BigEndian.Uint16(data[4+i*2:])
+	}
+	return nil
+}
+
+// Preference Option
+type PreferenceOption struct {
+	PreferenceValue byte
+}
+
+func (o *PreferenceOption) Code() uint16 {
+	return OptionCodePreference
+}
+func (o *PreferenceOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 5)
+	binary.BigEndian.PutUint16(data, OptionCodePreference)
+	binary.BigEndian.PutUint16(data[2:], 1)
+	data[4] = o.PreferenceValue
+	return data, nil
+}
+func (o *PreferenceOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 5 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodePreference {
+		return ErrInvalidType
+	}
+	if binary.BigEndian.Uint16(data[2:]) != 1 {
+		return ErrTooManyOptions
+	}
+	o.PreferenceValue = data[4]
+	data = data[5:]
+	return nil
+}
+
+// Elapsed Time Option
+type ElapsedTimeOption struct {
+	ElapsedTime uint16
+}
+
+func (o *ElapsedTimeOption) Code() uint16 {
+	return OptionCodeElapsedTime
+}
+func (o *ElapsedTimeOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 6)
+	binary.BigEndian.PutUint16(data, OptionCodeElapsedTime)
+	binary.BigEndian.PutUint16(data[2:], 2)
+	binary.BigEndian.PutUint16(data[4:], o.ElapsedTime)
+	return data, nil
+}
+func (o *ElapsedTimeOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 6 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeElapsedTime {
+		return ErrInvalidType
+	}
+	if binary.BigEndian.Uint16(data[2:]) != 2 {
+		return ErrTooManyOptions
+	}
+	o.ElapsedTime = binary.BigEndian.Uint16(data[4:])
+	data = data[6:]
 	return nil
 }
