@@ -566,3 +566,275 @@ func (o *StatusCodeOption) UnmarshalBinary(data []byte) error {
 	o.StatusMessage = string(data[5 : olen+4])
 	return nil
 }
+
+// Rapid Commit Option
+type RapidCommitOption struct{}
+
+func (o *RapidCommitOption) Code() uint16 {
+	return OptionCodeRapidCommit
+}
+func (o *RapidCommitOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 4)
+	binary.BigEndian.PutUint16(data, OptionCodeRapidCommit)
+	binary.BigEndian.PutUint16(data[2:], 0)
+	return data, nil
+}
+func (o *RapidCommitOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeRapidCommit {
+		return ErrInvalidType
+	}
+	if binary.BigEndian.Uint16(data[2:]) != 0 {
+		return ErrInvalidData
+	}
+	return nil
+}
+
+// User Class Option
+type UserClassOption struct {
+	UserClassData [][]byte
+}
+
+func (o *UserClassOption) Code() uint16 {
+	return OptionCodeUserClass
+}
+func (o *UserClassOption) MarshalBinary() ([]byte, error) {
+	size := 0
+	for i := range o.UserClassData {
+		size += 2 + len(o.UserClassData[i])
+	}
+	if size > 65539 {
+		return nil, ErrWontFit
+	}
+	data := make([]byte, 4+size)
+	binary.BigEndian.PutUint16(data, OptionCodeUserClass)
+	binary.BigEndian.PutUint16(data[2:], uint16(size))
+	pos := 4
+	for i := range o.UserClassData {
+		binary.BigEndian.PutUint16(data[pos:], uint16(len(o.UserClassData[i])))
+		copy(data[pos+2:], o.UserClassData[i])
+		pos += len(o.UserClassData[i]) + 2
+	}
+	return data, nil
+}
+func (o *UserClassOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeUserClass {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	o.UserClassData = make([][]byte, 0)
+	data = data[4:]
+	for len(data) > 0 {
+		size := binary.BigEndian.Uint16(data)
+		o.UserClassData = append(o.UserClassData, data[2:size+2])
+		data = data[size+2:]
+	}
+	return nil
+}
+
+// Vendor Class Option
+type VendorClassOption struct {
+	VendorClassData [][]byte
+}
+
+func (o *VendorClassOption) Code() uint16 {
+	return OptionCodeVendorClass
+}
+func (o *VendorClassOption) MarshalBinary() ([]byte, error) {
+	size := 0
+	for i := range o.VendorClassData {
+		size += 2 + len(o.VendorClassData[i])
+	}
+	if size > 65535 {
+		return nil, ErrWontFit
+	}
+	data := make([]byte, 4+size)
+	binary.BigEndian.PutUint16(data, OptionCodeVendorClass)
+	binary.BigEndian.PutUint16(data[2:], uint16(size))
+	pos := 4
+	for i := range o.VendorClassData {
+		binary.BigEndian.PutUint16(data[pos:], uint16(len(o.VendorClassData[i])))
+		copy(data[pos+2:], o.VendorClassData[i])
+		pos += len(o.VendorClassData[i]) + 2
+	}
+	return data, nil
+}
+func (o *VendorClassOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeVendorClass {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	o.VendorClassData = make([][]byte, 0)
+	data = data[4:]
+	for len(data) > 0 {
+		size := binary.BigEndian.Uint16(data)
+		o.VendorClassData = append(o.VendorClassData, data[2:size+2])
+		data = data[size+2:]
+	}
+	return nil
+}
+
+// Vendor-specific Information Option
+type VendorOptsOption struct {
+	EnterpriseNumber uint32
+	OptionData       []VendorOptsOptionData
+}
+type VendorOptsOptionData struct {
+	OptionCode uint16
+	OptionData []byte
+}
+
+func (o *VendorOptsOption) Code() uint16 {
+	return OptionCodeVendorOpts
+}
+func (o *VendorOptsOption) MarshalBinary() ([]byte, error) {
+	size := 4 //enterprise number
+	for _, v := range o.OptionData {
+		size += 4 + len(v.OptionData)
+	}
+	if size > 65535 {
+		return nil, ErrWontFit
+	}
+	data := make([]byte, size+4)
+	binary.BigEndian.PutUint16(data, OptionCodeVendorOpts)
+	binary.BigEndian.PutUint16(data[2:], uint16(size))
+	binary.BigEndian.PutUint32(data[4:], o.EnterpriseNumber)
+	pos := 8
+	for _, v := range o.OptionData {
+		binary.BigEndian.PutUint16(data[pos:], v.OptionCode)
+		binary.BigEndian.PutUint16(data[pos+2:], uint16(len(v.OptionData)))
+		copy(data[pos+4:], v.OptionData)
+		pos += 4 + len(v.OptionData)
+	}
+	return data, nil
+}
+func (o *VendorOptsOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 8 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeVendorOpts {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	o.EnterpriseNumber = binary.BigEndian.Uint32(data[4:])
+	data = data[8:]
+	for len(data) > 0 {
+		if len(data) < 4 {
+			return ErrUnexpectedEOF
+		}
+		optData := VendorOptsOptionData{}
+		optData.OptionCode = binary.BigEndian.Uint16(data)
+		optLen := binary.BigEndian.Uint16(data[2:])
+		if len(data) < int(optLen)+4 {
+			return ErrUnexpectedEOF
+		}
+		optData.OptionData = data[4 : optLen+4]
+		o.OptionData = append(o.OptionData, optData)
+		data = data[optLen+4:]
+	}
+	return nil
+}
+
+// Interface-Id Option
+type InterfaceIdOption struct {
+	InterfaceId []byte
+}
+
+func (o *InterfaceIdOption) Code() uint16 {
+	return OptionCodeInterfaceId
+}
+func (o *InterfaceIdOption) MarshalBinary() ([]byte, error) {
+	if len(o.InterfaceId) > 65535 {
+		return nil, ErrWontFit
+	}
+	data := make([]byte, len(o.InterfaceId)+4)
+	binary.BigEndian.PutUint16(data, OptionCodeInterfaceId)
+	binary.BigEndian.PutUint16(data[2:], uint16(len(o.InterfaceId)))
+	copy(data[4:], o.InterfaceId)
+	return data, nil
+}
+func (o *InterfaceIdOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeInterfaceId {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	o.InterfaceId = data[4 : olen+4]
+	return nil
+}
+
+// Reconfigure Message Option
+type ReconfMsgOption struct {
+	MsgType byte
+}
+
+func (o *ReconfMsgOption) Code() uint16 {
+	return OptionCodeReconfMsg
+}
+func (o *ReconfMsgOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 5)
+	binary.BigEndian.PutUint16(data, OptionCodeReconfMsg)
+	binary.BigEndian.PutUint16(data[2:], 1)
+	data[4] = o.MsgType
+	return data, nil
+}
+func (o *ReconfMsgOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 5 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeReconfMsg {
+		return ErrInvalidType
+	}
+	if binary.BigEndian.Uint16(data[2:]) != 1 {
+		return ErrInvalidData
+	}
+	o.MsgType = data[4]
+	return nil
+}
+
+// Reconfigure Accept Option
+type ReconfAcceptOption struct{}
+
+func (o *ReconfAcceptOption) Code() uint16 {
+	return OptionCodeReconfAccept
+}
+func (o *ReconfAcceptOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 4)
+	binary.BigEndian.PutUint16(data, OptionCodeReconfAccept)
+	binary.BigEndian.PutUint16(data[2:], 0)
+	return data, nil
+}
+func (o *ReconfAcceptOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeReconfAccept {
+		return ErrInvalidType
+	}
+	if binary.BigEndian.Uint16(data[2:]) != 0 {
+		return ErrInvalidData
+	}
+	return nil
+}
