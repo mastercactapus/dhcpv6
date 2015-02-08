@@ -1,11 +1,14 @@
 # DHCPv6 Library
 
-Work-in-progress DHCPv6 library in Go. [API Docs](http://godoc.org/github.com/mastercactapus/dhcpv6)
+Work-in-progress DHCPv6 library in Go.
+
+[API Docs](http://godoc.org/github.com/mastercactapus/dhcpv6)
 
 ## Goals
 
 - KISS
 - Fast
+- Learn/teach how DHCPv6 works
 - Small API (if it's easy to code it, don't)
 
 ## Features

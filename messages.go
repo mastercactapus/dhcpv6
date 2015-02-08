@@ -5,33 +5,35 @@ import (
 	"net"
 )
 
+type DhcpMessageType byte
+
 const (
 	//message types
-	TypeSolicit            byte = 1
-	TypeAdvertise          byte = 2
-	TypeRequest            byte = 3
-	TypeConfirm            byte = 4
-	TypeRenew              byte = 5
-	TypeRebind             byte = 6
-	TypeReply              byte = 7
-	TypeRelease            byte = 8
-	TypeDecline            byte = 9
-	TypeReconfigure        byte = 10
-	TypeInformationRequest byte = 11
-	TypeRelayForward       byte = 12
-	TypeRelayReply         byte = 13
+	TypeSolicit            DhcpMessageType = 1
+	TypeAdvertise          DhcpMessageType = 2
+	TypeRequest            DhcpMessageType = 3
+	TypeConfirm            DhcpMessageType = 4
+	TypeRenew              DhcpMessageType = 5
+	TypeRebind             DhcpMessageType = 6
+	TypeReply              DhcpMessageType = 7
+	TypeRelease            DhcpMessageType = 8
+	TypeDecline            DhcpMessageType = 9
+	TypeReconfigure        DhcpMessageType = 10
+	TypeInformationRequest DhcpMessageType = 11
+	TypeRelayForward       DhcpMessageType = 12
+	TypeRelayReply         DhcpMessageType = 13
 )
 
 // Client/Server Message Format
 type DhcpMessage struct {
-	MsgType       byte
+	MsgType       DhcpMessageType
 	TransactionId [3]byte
 	Options       []Option
 }
 
 func (d *DhcpMessage) MarshalBinary() ([]byte, error) {
 	data := make([]byte, 4, 32768)
-	data[0] = d.MsgType
+	data[0] = byte(d.MsgType)
 	copy(data[1:], d.TransactionId[:])
 	for _, v := range d.Options {
 		optionData, err := v.MarshalBinary()
@@ -46,7 +48,7 @@ func (d *DhcpMessage) UnmarshalBinary(data []byte) error {
 	if len(data) < 4 {
 		return ErrUnexpectedEOF
 	}
-	d.MsgType = data[0]
+	d.MsgType = DhcpMessageType(data[0])
 	d.Options = make([]Option, 0, 10)
 	copy(d.TransactionId[:], data[1:3])
 	data = data[4:]
@@ -67,7 +69,7 @@ func (d *DhcpMessage) UnmarshalBinary(data []byte) error {
 
 // Relay Agent/Server Message Format
 type DhcpRelayMessage struct {
-	MsgType     byte
+	MsgType     DhcpMessageType
 	HopCount    byte
 	LinkAddress net.IP
 	PeerAddress net.IP
@@ -82,7 +84,7 @@ func (d *DhcpRelayMessage) MarshalBinary() ([]byte, error) {
 		return nil, ErrInvalidIpv6Address
 	}
 	data := make([]byte, 34, 32768)
-	data[0] = d.MsgType
+	data[0] = byte(d.MsgType)
 	data[1] = d.HopCount
 	copy(data[2:], d.LinkAddress)
 	copy(data[18:], d.PeerAddress)
@@ -99,7 +101,7 @@ func (d *DhcpRelayMessage) UnmarshalBinary(data []byte) error {
 	if len(data) < 34 {
 		return ErrUnexpectedEOF
 	}
-	d.MsgType = data[0]
+	d.MsgType = DhcpMessageType(data[0])
 	d.HopCount = data[1]
 	d.LinkAddress = data[2:18]
 	d.PeerAddress = data[18:34]
