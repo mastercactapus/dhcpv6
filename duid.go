@@ -54,8 +54,8 @@ func (d *LltDuid) MarshalBinary() ([]byte, error) {
 	data := make([]byte, 8+len(d.LlAddress))
 	binary.BigEndian.PutUint16(data, DuidTypeLlt)
 	binary.BigEndian.PutUint16(data[2:], d.HardwareType)
-	binary.BigEndian.PutUint32(data[6:], d.Time)
-	copy(data[10:], d.LlAddress)
+	binary.BigEndian.PutUint32(data[4:], d.Time)
+	copy(data[8:], d.LlAddress)
 	return data, nil
 }
 func (d *LltDuid) UnmarshalBinary(data []byte) error {
@@ -70,7 +70,7 @@ func (d *LltDuid) UnmarshalBinary(data []byte) error {
 	}
 	d.HardwareType = binary.BigEndian.Uint16(data[2:])
 	d.Time = binary.BigEndian.Uint32(data[4:])
-	d.LlAddress = data[10:]
+	d.LlAddress = data[8:]
 	return nil
 }
 
