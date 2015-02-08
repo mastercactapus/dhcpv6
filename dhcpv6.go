@@ -22,22 +22,6 @@ const (
 	PortClient = 546
 	PortServer = 547
 
-	//message types
-	_ = iota
-	TypeSolicit
-	TypeAdvertise
-	TypeRequest
-	TypeConfirm
-	TypeRenew
-	TypeRebind
-	TypeReply
-	TypeRelease
-	TypeDecline
-	TypeReconfigure
-	TypeInformationRequest
-	TypeRelayForward
-	TypeRelayReply
-
 	//Status Codes
 	Success = iota
 	UnspecFail
