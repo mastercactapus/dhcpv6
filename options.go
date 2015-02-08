@@ -475,16 +475,42 @@ func (o *ElapsedTimeOption) UnmarshalBinary(data []byte) error {
 // Relay Message Option
 // TODO: this
 type RelayMsgOption struct {
+	DhcpRelayMessage DhcpRelayMessage
 }
 
 func (o *RelayMsgOption) Code() uint16 {
 	return OptionCodeRelayMsg
 }
 func (o *RelayMsgOption) MarshalBinary() ([]byte, error) {
-	return nil, ErrNotImplemented
+	relayData, err := o.DhcpRelayMessage.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	if len(relayData) > 65535 {
+		return nil, ErrWontFit
+	}
+	data := make([]byte, 4+len(relayData))
+	binary.BigEndian.PutUint16(data, OptionCodeRelayMsg)
+	binary.BigEndian.PutUint16(data[2:], uint16(len(relayData)))
+	copy(data[4:], relayData)
+	return data, nil
 }
 func (o *RelayMsgOption) UnmarshalBinary(data []byte) error {
-	return ErrNotImplemented
+	if len(data) < 4 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != OptionCodeRelayMsg {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	err := o.DhcpRelayMessage.UnmarshalBinary(data[4 : olen+4])
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Authentication Option
