@@ -18,7 +18,7 @@ func ExampleDhcpMessage_MarshalBinary() {
 				T2:   0,
 			},
 			&OroOption{
-				[]uint16{
+				RequestedOptionCodes: []uint16{
 					23, //DNS recursive name server
 					24, //Domain Search List
 					56, //NTP Server
