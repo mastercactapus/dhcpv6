@@ -76,10 +76,10 @@ type DhcpRelayMessage struct {
 
 func (d *DhcpRelayMessage) MarshalBinary() ([]byte, error) {
 	if len(d.LinkAddress) != 16 {
-		return ErrInvalidIpv6Address
+		return nil, ErrInvalidIpv6Address
 	}
 	if len(d.PeerAddress) != 16 {
-		return ErrInvalidIpv6Address
+		return nil, ErrInvalidIpv6Address
 	}
 	data := make([]byte, 34, 32768)
 	data[0] = d.MsgType
