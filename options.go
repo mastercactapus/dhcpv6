@@ -41,6 +41,40 @@ func UnmarshalBinaryOption(data []byte) (option Option, err error) {
 		option = new(ClientIdOption)
 	case OptionCodeServerId:
 		option = new(ServerIdOption)
+	case OptionCodeIaNa:
+		option = new(IaNaOption)
+	case OptionCodeIaTa:
+		option = new(IaTaOption)
+	case OptionCodeIaAddr:
+		option = new(IaAddrOption)
+	case OptionCodeOro:
+		option = new(OroOption)
+	case OptionCodePreference:
+		option = new(PreferenceOption)
+	case OptionCodeElapsedTime:
+		option = new(ElapsedTimeOption)
+	case OptionCodeRelayMsg:
+		option = new(RelayMsgOption)
+	case OptionCodeAuth:
+		option = new(AuthOption)
+	case OptionCodeUnicast:
+		option = new(UnicastOption)
+	case OptionCodeStatusCode:
+		option = new(StatusCodeOption)
+	case OptionCodeRapidCommit:
+		option = new(RapidCommitOption)
+	case OptionCodeUserClass:
+		option = new(UserClassOption)
+	case OptionCodeVendorClass:
+		option = new(VendorClassOption)
+	case OptionCodeVendorOpts:
+		option = new(VendorOptsOption)
+	case OptionCodeInterfaceId:
+		option = new(InterfaceIdOption)
+	case OptionCodeReconfMsg:
+		option = new(ReconfMsgOption)
+	case OptionCodeReconfAccept:
+		option = new(ReconfAcceptOption)
 	}
 	if option != nil {
 		err = option.UnmarshalBinary(data)
