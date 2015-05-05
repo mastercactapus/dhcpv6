@@ -32,6 +32,7 @@ const (
 	OptionCodeFQDN         OptionCode = 39
 	OptionCodeNextHop      OptionCode = 242
 	OptionCodeRtPrefix     OptionCode = 243
+	OptionCodeMTU          OptionCode = 244
 )
 
 // DHCPv6 options are scoped by using encapsulation.  Some options apply
@@ -94,6 +95,8 @@ func UnmarshalBinaryOption(data []byte) (option Option, err error) {
 		option = new(NextHopOption)
 	case OptionCodeRtPrefix:
 		option = new(RtPrefixOption)
+	case OptionCodeMTU:
+		option = new(MTUOption)
 	default:
 		option = new(UnknownOption)
 	}
@@ -1111,5 +1114,38 @@ func (o *FQDNOption) UnmarshalBinary(data []byte) error {
 	}
 //	o.Flags = data[4] ???
 	o.DomainName = string(data[4 : olen + 4])
+	return nil
+}
+
+// MTU Option
+type MTUOption struct {
+	MTU	uint16
+}
+
+func (o *MTUOption) Code() OptionCode {
+	return OptionCodeMTU
+}
+
+func (o *MTUOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 4 + 2)
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeMTU))
+	binary.BigEndian.PutUint16(data[2:], uint16(2))
+	binary.BigEndian.PutUint16(data[4:], o.MTU)
+
+	return data, nil
+}
+
+func (o *MTUOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 6 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeMTU) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen) + 4 {
+		return ErrUnexpectedEOF
+	}
+	o.MTU = binary.BigEndian.Uint16(data[4:])
 	return nil
 }
