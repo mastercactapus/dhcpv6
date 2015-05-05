@@ -367,7 +367,7 @@ func (o *IaAddrOption) MarshalBinary() ([]byte, error) {
 		data = make([]byte, 28, 63359) //65535+4
 	}
 	binary.BigEndian.PutUint16(data, uint16(OptionCodeIaAddr))
-	if len(o.Ipv6Address) != 16 {
+	if len(o.Ipv6Address) != net.IPv6len {
 		return nil, ErrInvalidIpv6Address
 	}
 	copy(data[4:], o.Ipv6Address)
@@ -613,7 +613,7 @@ func (o *UnicastOption) Code() OptionCode {
 	return OptionCodeUnicast
 }
 func (o *UnicastOption) MarshalBinary() ([]byte, error) {
-	if len(o.ServerAddress) != 16 {
+	if len(o.ServerAddress) != net.IPv6len {
 		return nil, ErrInvalidIpv6Address
 	}
 	data := make([]byte, 20)
@@ -629,7 +629,7 @@ func (o *UnicastOption) UnmarshalBinary(data []byte) error {
 	if binary.BigEndian.Uint16(data) != uint16(OptionCodeUnicast) {
 		return ErrInvalidType
 	}
-	if binary.BigEndian.Uint16(data[2:]) != 16 {
+	if binary.BigEndian.Uint16(data[2:]) != net.IPv6len {
 		return ErrInvalidData
 	}
 	o.ServerAddress = data[4:20]
