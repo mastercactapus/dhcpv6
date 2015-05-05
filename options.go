@@ -29,6 +29,7 @@ const (
 	OptionCodeInterfaceId  OptionCode = 18
 	OptionCodeReconfMsg    OptionCode = 19
 	OptionCodeReconfAccept OptionCode = 20
+	OptionCodeFQDN         OptionCode = 39
 	OptionCodeNextHop      OptionCode = 242
 	OptionCodeRtPrefix     OptionCode = 243
 )
@@ -87,6 +88,8 @@ func UnmarshalBinaryOption(data []byte) (option Option, err error) {
 		option = new(ReconfMsgOption)
 	case OptionCodeReconfAccept:
 		option = new(ReconfAcceptOption)
+	case OptionCodeFQDN:
+		option = new(FQDNOption)
 	case OptionCodeNextHop:
 		option = new(NextHopOption)
 	case OptionCodeRtPrefix:
@@ -1072,5 +1075,41 @@ func (o *RtPrefixOption) UnmarshalBinary(data []byte) error {
 	o.Prefixlen = data[8]
 	o.Metric = data[9]
 	o.Prefix = net.IP(data[10:])
+	return nil
+}
+
+// FQDN Option
+type FQDNOption struct {
+	Flags      uint8
+	DomainName string
+}
+
+func (o *FQDNOption) Code() OptionCode {
+	return OptionCodeFQDN
+}
+
+func (o *FQDNOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 4 + 1 + len(o.DomainName))
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeFQDN))
+	binary.BigEndian.PutUint16(data[2:], uint16(1 + len(o.DomainName)))
+	data[4] = o.Flags
+	copy(data[5:], o.DomainName)
+
+	return data, nil
+}
+
+func (o *FQDNOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 5 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeFQDN) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen) + 4 {
+		return ErrUnexpectedEOF
+	}
+//	o.Flags = data[4] ???
+	o.DomainName = string(data[4 : olen + 4])
 	return nil
 }
