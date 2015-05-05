@@ -229,7 +229,7 @@ func (o *IaNaOption) MarshalBinary() ([]byte, error) {
 	binary.BigEndian.PutUint16(data, uint16(OptionCodeIaNa))
 	copy(data[4:], o.IAID[:])
 	binary.BigEndian.PutUint32(data[8:], o.T1)
-	binary.BigEndian.PutUint32(data[12:], o.T1)
+	binary.BigEndian.PutUint32(data[12:], o.T2)
 	for i := range o.IaNaOptions {
 		optionData, err := o.IaNaOptions[i].MarshalBinary()
 		if err != nil {
