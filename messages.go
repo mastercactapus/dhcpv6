@@ -50,7 +50,7 @@ func (d *DhcpMessage) UnmarshalBinary(data []byte) error {
 	}
 	d.MsgType = DhcpMessageType(data[0])
 	d.Options = make([]Option, 0, 10)
-	copy(d.TransactionId[:], data[1:3])
+	copy(d.TransactionId[:], data[1:4])
 	data = data[4:]
 	for len(data) > 0 {
 		if len(data) < 4 {
