@@ -106,6 +106,7 @@ func (d *DhcpRelayMessage) UnmarshalBinary(data []byte) error {
 	d.LinkAddress = data[2:18]
 	d.PeerAddress = data[18:34]
 	data = data[34:]
+	d.Options = nil
 	for len(data) > 0 {
 		if len(data) < 4 {
 			return ErrUnexpectedEOF
