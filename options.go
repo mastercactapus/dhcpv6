@@ -29,6 +29,8 @@ const (
 	OptionCodeInterfaceId  OptionCode = 18
 	OptionCodeReconfMsg    OptionCode = 19
 	OptionCodeReconfAccept OptionCode = 20
+	OptionCodeNextHop      OptionCode = 242
+	OptionCodeRtPrefix     OptionCode = 243
 )
 
 // DHCPv6 options are scoped by using encapsulation.  Some options apply
@@ -85,6 +87,10 @@ func UnmarshalBinaryOption(data []byte) (option Option, err error) {
 		option = new(ReconfMsgOption)
 	case OptionCodeReconfAccept:
 		option = new(ReconfAcceptOption)
+	case OptionCodeNextHop:
+		option = new(NextHopOption)
+	case OptionCodeRtPrefix:
+		option = new(RtPrefixOption)
 	default:
 		option = new(UnknownOption)
 	}
@@ -942,5 +948,129 @@ func (o *ReconfAcceptOption) UnmarshalBinary(data []byte) error {
 	if binary.BigEndian.Uint16(data[2:]) != 0 {
 		return ErrInvalidData
 	}
+	return nil
+}
+
+// Next Hop Option
+type NextHopOption struct {
+	NextHop        net.IP
+	NextHopOptions []Option
+}
+
+func (o *NextHopOption) Code() OptionCode {
+	return OptionCodeNextHop
+}
+
+func (o *NextHopOption) MarshalBinary() ([]byte, error) {
+	var data []byte
+	if len(o.NextHopOptions) == 0 {
+		data = make([]byte, 20)
+	} else {
+		data = make([]byte, 20, 65539) //65535+4
+	}
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeNextHop))
+	if len(o.NextHop) != net.IPv6len {
+		return nil, ErrInvalidIpv6Address
+	}
+	copy(data[4:20], o.NextHop[0:net.IPv6len])
+
+	for i := range o.NextHopOptions {
+		optionData, err := o.NextHopOptions[i].MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		if len(data)+len(optionData) > cap(data) {
+			return nil, ErrWontFit
+		}
+		data = append(data, optionData...)
+	}
+	binary.BigEndian.PutUint16(data[2:], uint16(len(data)-4))
+	return data, nil
+}
+
+func (o *NextHopOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 20 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeNextHop) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	o.NextHop = net.IP(data[4:20])
+	if len(data) == 20 {
+		o.NextHopOptions = make([]Option, 0)
+	} else {
+		//TODO: better way to guess capacity?
+		o.NextHopOptions = make([]Option, 0, 10)
+	}
+	optionData := data[20 : olen+4]
+	for len(optionData) != 0 {
+		if len(optionData) < 4 {
+			return ErrUnexpectedEOF
+		}
+		nextSize := binary.BigEndian.Uint16(optionData[2:])
+		option, err := UnmarshalBinaryOption(optionData[:nextSize+4])
+		if err != nil {
+			return err
+		}
+		o.NextHopOptions = append(o.NextHopOptions, option)
+		optionData = optionData[nextSize+4:]
+	}
+	return nil
+}
+
+// RtPrefix Option
+type RtPrefixOption struct {
+	Lifetime	uint32
+	Prefixlen	uint8
+	Metric		uint8
+	Prefix		net.IP
+}
+
+func (o *RtPrefixOption) Code() OptionCode {
+	return OptionCodeRtPrefix
+}
+
+func (o *RtPrefixOption) MarshalBinary() ([]byte, error) {
+	if len(o.Prefix) != net.IPv6len {
+		return nil, ErrInvalidIpv6Address
+	}
+
+	if o.Prefixlen > 128 {
+		return nil, ErrInvalidIpv6Address
+	}
+
+	data := make([]byte, 4 + 4 + 1 + 1 + net.IPv6len)
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeRtPrefix))
+	binary.BigEndian.PutUint16(data[2:], uint16(4 + 1 + 1 + net.IPv6len))
+	binary.BigEndian.PutUint32(data[4:], o.Lifetime)
+	data[8] = o.Prefixlen
+	data[9] = o.Metric
+	copy(data[10:], o.Prefix)
+
+	return data, nil
+}
+
+func (o *RtPrefixOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 26 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeRtPrefix) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	if data[8] > 128 {
+		return ErrInvalidIpv6Address
+	}
+	o.Lifetime = binary.BigEndian.Uint32(data[4:])
+	o.Prefixlen = data[8]
+	o.Metric = data[9]
+	o.Prefix = net.IP(data[10:])
 	return nil
 }
