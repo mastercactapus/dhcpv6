@@ -29,6 +29,8 @@ const (
 	OptionCodeInterfaceId  OptionCode = 18
 	OptionCodeReconfMsg    OptionCode = 19
 	OptionCodeReconfAccept OptionCode = 20
+	OptionCodeIaPd         OptionCode = 25
+	OptionCodeIaPrefix     OptionCode = 26
 	OptionCodeFQDN         OptionCode = 39
 	OptionCodeNextHop      OptionCode = 242
 	OptionCodeRtPrefix     OptionCode = 243
