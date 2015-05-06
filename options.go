@@ -29,6 +29,12 @@ const (
 	OptionCodeInterfaceId  OptionCode = 18
 	OptionCodeReconfMsg    OptionCode = 19
 	OptionCodeReconfAccept OptionCode = 20
+	OptionCodeIaPd         OptionCode = 25
+	OptionCodeIaPrefix     OptionCode = 26
+	OptionCodeFQDN         OptionCode = 39
+	OptionCodeNextHop      OptionCode = 242
+	OptionCodeRtPrefix     OptionCode = 243
+	OptionCodeMTU          OptionCode = 244
 )
 
 // DHCPv6 options are scoped by using encapsulation.  Some options apply
@@ -85,6 +91,14 @@ func UnmarshalBinaryOption(data []byte) (option Option, err error) {
 		option = new(ReconfMsgOption)
 	case OptionCodeReconfAccept:
 		option = new(ReconfAcceptOption)
+	case OptionCodeFQDN:
+		option = new(FQDNOption)
+	case OptionCodeNextHop:
+		option = new(NextHopOption)
+	case OptionCodeRtPrefix:
+		option = new(RtPrefixOption)
+	case OptionCodeMTU:
+		option = new(MTUOption)
 	default:
 		option = new(UnknownOption)
 	}
@@ -229,7 +243,7 @@ func (o *IaNaOption) MarshalBinary() ([]byte, error) {
 	binary.BigEndian.PutUint16(data, uint16(OptionCodeIaNa))
 	copy(data[4:], o.IAID[:])
 	binary.BigEndian.PutUint32(data[8:], o.T1)
-	binary.BigEndian.PutUint32(data[12:], o.T1)
+	binary.BigEndian.PutUint32(data[12:], o.T2)
 	for i := range o.IaNaOptions {
 		optionData, err := o.IaNaOptions[i].MarshalBinary()
 		if err != nil {
@@ -367,7 +381,7 @@ func (o *IaAddrOption) MarshalBinary() ([]byte, error) {
 		data = make([]byte, 28, 63359) //65535+4
 	}
 	binary.BigEndian.PutUint16(data, uint16(OptionCodeIaAddr))
-	if len(o.Ipv6Address) != 16 {
+	if len(o.Ipv6Address) != net.IPv6len {
 		return nil, ErrInvalidIpv6Address
 	}
 	copy(data[4:], o.Ipv6Address)
@@ -613,7 +627,7 @@ func (o *UnicastOption) Code() OptionCode {
 	return OptionCodeUnicast
 }
 func (o *UnicastOption) MarshalBinary() ([]byte, error) {
-	if len(o.ServerAddress) != 16 {
+	if len(o.ServerAddress) != net.IPv6len {
 		return nil, ErrInvalidIpv6Address
 	}
 	data := make([]byte, 20)
@@ -629,7 +643,7 @@ func (o *UnicastOption) UnmarshalBinary(data []byte) error {
 	if binary.BigEndian.Uint16(data) != uint16(OptionCodeUnicast) {
 		return ErrInvalidType
 	}
-	if binary.BigEndian.Uint16(data[2:]) != 16 {
+	if binary.BigEndian.Uint16(data[2:]) != net.IPv6len {
 		return ErrInvalidData
 	}
 	o.ServerAddress = data[4:20]
@@ -942,5 +956,198 @@ func (o *ReconfAcceptOption) UnmarshalBinary(data []byte) error {
 	if binary.BigEndian.Uint16(data[2:]) != 0 {
 		return ErrInvalidData
 	}
+	return nil
+}
+
+// Next Hop Option
+type NextHopOption struct {
+	NextHop        net.IP
+	NextHopOptions []Option
+}
+
+func (o *NextHopOption) Code() OptionCode {
+	return OptionCodeNextHop
+}
+
+func (o *NextHopOption) MarshalBinary() ([]byte, error) {
+	var data []byte
+	if len(o.NextHopOptions) == 0 {
+		data = make([]byte, 20)
+	} else {
+		data = make([]byte, 20, 65539) //65535+4
+	}
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeNextHop))
+	if len(o.NextHop) != net.IPv6len {
+		return nil, ErrInvalidIpv6Address
+	}
+	copy(data[4:20], o.NextHop[0:net.IPv6len])
+
+	for i := range o.NextHopOptions {
+		optionData, err := o.NextHopOptions[i].MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		if len(data)+len(optionData) > cap(data) {
+			return nil, ErrWontFit
+		}
+		data = append(data, optionData...)
+	}
+	binary.BigEndian.PutUint16(data[2:], uint16(len(data)-4))
+	return data, nil
+}
+
+func (o *NextHopOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 20 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeNextHop) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	o.NextHop = net.IP(data[4:20])
+	if len(data) == 20 {
+		o.NextHopOptions = make([]Option, 0)
+	} else {
+		//TODO: better way to guess capacity?
+		o.NextHopOptions = make([]Option, 0, 10)
+	}
+	optionData := data[20 : olen+4]
+	for len(optionData) != 0 {
+		if len(optionData) < 4 {
+			return ErrUnexpectedEOF
+		}
+		nextSize := binary.BigEndian.Uint16(optionData[2:])
+		option, err := UnmarshalBinaryOption(optionData[:nextSize+4])
+		if err != nil {
+			return err
+		}
+		o.NextHopOptions = append(o.NextHopOptions, option)
+		optionData = optionData[nextSize+4:]
+	}
+	return nil
+}
+
+// RtPrefix Option
+type RtPrefixOption struct {
+	Lifetime	uint32
+	Prefixlen	uint8
+	Metric		uint8
+	Prefix		net.IP
+}
+
+func (o *RtPrefixOption) Code() OptionCode {
+	return OptionCodeRtPrefix
+}
+
+func (o *RtPrefixOption) MarshalBinary() ([]byte, error) {
+	if len(o.Prefix) != net.IPv6len {
+		return nil, ErrInvalidIpv6Address
+	}
+
+	if o.Prefixlen > 128 {
+		return nil, ErrInvalidIpv6Address
+	}
+
+	data := make([]byte, 4 + 4 + 1 + 1 + net.IPv6len)
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeRtPrefix))
+	binary.BigEndian.PutUint16(data[2:], uint16(4 + 1 + 1 + net.IPv6len))
+	binary.BigEndian.PutUint32(data[4:], o.Lifetime)
+	data[8] = o.Prefixlen
+	data[9] = o.Metric
+	copy(data[10:], o.Prefix)
+
+	return data, nil
+}
+
+func (o *RtPrefixOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 26 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeRtPrefix) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen)+4 {
+		return ErrUnexpectedEOF
+	}
+	if data[8] > 128 {
+		return ErrInvalidIpv6Address
+	}
+	o.Lifetime = binary.BigEndian.Uint32(data[4:])
+	o.Prefixlen = data[8]
+	o.Metric = data[9]
+	o.Prefix = net.IP(data[10:])
+	return nil
+}
+
+// FQDN Option
+type FQDNOption struct {
+	Flags      uint8
+	DomainName string
+}
+
+func (o *FQDNOption) Code() OptionCode {
+	return OptionCodeFQDN
+}
+
+func (o *FQDNOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 4 + 1 + len(o.DomainName))
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeFQDN))
+	binary.BigEndian.PutUint16(data[2:], uint16(1 + len(o.DomainName)))
+	data[4] = o.Flags
+	copy(data[5:], o.DomainName)
+
+	return data, nil
+}
+
+func (o *FQDNOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 5 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeFQDN) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen) + 4 {
+		return ErrUnexpectedEOF
+	}
+//	o.Flags = data[4] ???
+	o.DomainName = string(data[4 : olen + 4])
+	return nil
+}
+
+// MTU Option
+type MTUOption struct {
+	MTU	uint16
+}
+
+func (o *MTUOption) Code() OptionCode {
+	return OptionCodeMTU
+}
+
+func (o *MTUOption) MarshalBinary() ([]byte, error) {
+	data := make([]byte, 4 + 2)
+	binary.BigEndian.PutUint16(data, uint16(OptionCodeMTU))
+	binary.BigEndian.PutUint16(data[2:], uint16(2))
+	binary.BigEndian.PutUint16(data[4:], o.MTU)
+
+	return data, nil
+}
+
+func (o *MTUOption) UnmarshalBinary(data []byte) error {
+	if len(data) < 6 {
+		return ErrUnexpectedEOF
+	}
+	if binary.BigEndian.Uint16(data) != uint16(OptionCodeMTU) {
+		return ErrInvalidType
+	}
+	olen := binary.BigEndian.Uint16(data[2:])
+	if len(data) < int(olen) + 4 {
+		return ErrUnexpectedEOF
+	}
+	o.MTU = binary.BigEndian.Uint16(data[4:])
 	return nil
 }
