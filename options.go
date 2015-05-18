@@ -533,9 +533,8 @@ func (o *ElapsedTimeOption) UnmarshalBinary(data []byte) error {
 }
 
 // Relay Message Option
-// TODO: this
 type RelayMsgOption struct {
-	DhcpRelayMessage DhcpRelayMessage
+	DhcpRelayMessage DhcpMessage
 }
 
 func (o *RelayMsgOption) Code() OptionCode {
