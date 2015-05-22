@@ -651,7 +651,7 @@ func (o *UnicastOption) UnmarshalBinary(data []byte) error {
 
 // Status Code Option
 type StatusCodeOption struct {
-	StatusCode    byte
+	StatusCode    uint16
 	StatusMessage string
 }
 
@@ -663,15 +663,15 @@ func (o *StatusCodeOption) MarshalBinary() ([]byte, error) {
 	if len(msgData) > 65534 {
 		return nil, ErrWontFit
 	}
-	data := make([]byte, 5+len(msgData))
+	data := make([]byte, 6+len(msgData))
 	binary.BigEndian.PutUint16(data, uint16(OptionCodeStatusCode))
-	binary.BigEndian.PutUint16(data[2:], uint16(len(msgData)+1))
-	data[4] = o.StatusCode
-	copy(data[5:], msgData)
+	binary.BigEndian.PutUint16(data[2:], uint16(len(msgData)+2))
+	binary.BigEndian.PutUint16(data[4:], o.StatusCode)
+	copy(data[6:], msgData)
 	return data, nil
 }
 func (o *StatusCodeOption) UnmarshalBinary(data []byte) error {
-	if len(data) < 5 {
+	if len(data) < 6 {
 		return ErrUnexpectedEOF
 	}
 	if binary.BigEndian.Uint16(data) != uint16(OptionCodeStatusCode) {
@@ -681,8 +681,8 @@ func (o *StatusCodeOption) UnmarshalBinary(data []byte) error {
 	if len(data) < int(olen)+4 {
 		return ErrUnexpectedEOF
 	}
-	o.StatusCode = data[4]
-	o.StatusMessage = string(data[5 : olen+4])
+	o.StatusCode = binary.BigEndian.Uint16(data[4:])
+	o.StatusMessage = string(data[6 : olen+4])
 	return nil
 }
 
